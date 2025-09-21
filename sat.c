@@ -10,9 +10,9 @@ typedef unsigned L; typedef struct{I c;L bl;} Watcher;
 enum{LITS=0x10000,LITC=0x400000,VARS=LITS/2,VARB=VARS/64}; // also see init
 I attempts=1000000; F decay=0.99; // gQ[0..n]=solution
 V init(),dump(),reset(); I usr_clause(I,I*),solve(),pLit(I),vLit(I);
-#define or(a...) _(int r[]={a};usr_clause(arrlen(r),r));
-
-#define _(e...) ({e;}) // GNU C statement expressions
+#define or(a...) {int r[]={a};usr_clause(arrlen(r),r);}
+// Interesting logic in make_space(), prop() and analyze()
+#define _(e...) ({e;}) /* GNU C statement expressions */
 #define i(a,e) _(I $=a;I i=0;W(i<$){e;i++;}$!=i)
 #define k(a,b,e) _(I $=b;I k=a;W(k<$){e;k++;}$!=k)
 #define r(a,e...) _(typeof(a)r=a;e;r)
@@ -41,6 +41,7 @@ V init(),dump(),reset(); I usr_clause(I,I*),solve(),pLit(I),vLit(I);
 // TODO: interleave gA.av
 // TODO: binary clauses
 // TODO: unsat proofs
+// TODO: growing gC.end
 struct{N,a[VARS];} gLv; // backjump levels. Q[ai]
 struct{N;Watcher*a;} gW[LITS]; // TODO: dont use malloc
 struct{N,head;L a[VARS];} gQ; // assignment queue/trail
@@ -71,7 +72,7 @@ V rewatch(I cr,I new){c02(i(wv.n,if(wv.ai.c==cr){wv.ai.c=new;B}));if(locked(cr))
 I make_space(N){AS(n);I j=1;W(gC.x<=gC.t+n&&(j=gC.a[gC.x])){if(locked(gC.x)&&gLv.n){
   rewatch(gC.x,gC.t);i(j+1,gC.a[gC.t++]=gC.a[gC.x++]);}else{rewatch(gC.x,_);gC.x+=j+1;}}
   R r(gC.t,gC.t+=n+1;k(gC.t,gC.x,gC.ak=0);if(!j){gC.t=gC.x=gC.end<gC.t?gC.temp:gC.t;});}
-I clause(I cr,I usr){AS(cr<gC.temp);AS(cn);if(cn==1){enq(*ca,_);gC.n=cr;R _;}
+I clause(I cr,I usr){AS(!gC.temp||cr<gC.temp);AS(cn);if(cn==1){enq(*ca,_);gC.n=cr;R _;}
   if(!usr&&cn>8)cr=r(make_space(cn),i(cn+1,gC.a[r+i]=gC.a[cr+i]);gC.n=cr);watch(cr);R cr;}
 I usr_clause(N,int*a){R r(p(gC,n),i(n,I v=vLit(ai);AS(v<LITS);
   gV.n=mx(gV.n,v/2);p(gC,v);hp_put(v));clause(r,1));}
@@ -105,3 +106,51 @@ V dump(V){
     pf("\n<!Vars> ")k(1,gV.n,N=k*2+1;pf("\n% d wb: ",pLit(n))i(gW[n].n,pf("%3d|%d ",gW[n].ai.c,pLit(gW[n].ai.bl))));
     pf("\n<Assigns>")k(1,gV.n,pf("\n%c%d |%.1f",val(k*2)?' ':val(k*2+1)?'-':'?',k,gV.ak));
     pf("\n----------END DUMP----------\n")}
+/* ---------------- Sudoku example ----------------- */
+#define j(a,e) _(I $=a;I j=0;W(j<$){e;j++;}$!=j)
+#define l(a,b,e) _(I $=b;I l=a;W(l<$){e;l++;}$!=l)
+I pos(I r,I c,I v){R r*81+c*9+v;}
+V solve_sudoku(I*sudoku){
+  i(9,j(9,
+        I c[9]={};
+        k(1,10,c[k-1]=pos(i,j,k));usr_clause(9,c);
+        k(1,10,l(1,10,if(k!=l)or(-pos(i,j,k),-pos(i,j,l)))))); // suboptimal.
+  k(1,10,
+      i(9,I c[9]={};j(9,c[j]=pos(i,j,k));usr_clause(9,c));
+      i(9,I c[9]={};j(9,c[j]=pos(j,i,k));usr_clause(9,c));
+      i(9,I c[9]={};j(9,c[j]=pos(i/3*3+j%3,i%3*3+j/3,k));usr_clause(9,c)));
+  i(9,j(9,if(sudoku[i*9+j])or(pos(i,j,sudoku[i*9+j]))));
+  I r=solve();
+  pf("s %s\n",r==0?"UNSATISFIABLE":r==1?"SATISFIABLE":"UNKNOWN");
+  pf("v ");i(gQ.n,printf("%d ",pLit(gQ.ai)));
+  pf("\n\n");
+
+  I answer[81]={};
+  i(gQ.n,N=pLit(gQ.ai)-1;if(n>=0)answer[n/9]=n%9+1);
+  i(9,j(9,pf("%d ",sudoku[i*9+j]));pf("\n")); pf("\n\n");
+  i(9,j(9,pf("%d ",answer[i*9+j]));pf("\n"));
+  // dump();
+}
+int main(V){
+  I board1[]={ // easy board. 0.014 seconds
+    0,0,0,2,6,0,7,0,1,
+    6,8,0,0,7,0,0,9,0,
+    1,9,0,0,0,4,5,0,0,
+    8,2,0,1,0,0,0,4,0,
+    0,0,4,6,0,2,9,0,0,
+    0,5,0,0,0,3,0,2,8,
+    0,0,9,3,0,0,0,7,4,
+    0,4,0,0,5,0,0,3,6,
+    7,0,3,0,1,8,0,0,0};
+  I board2[]={ // hard board. 0.9 seconds
+    0,2,0,0,0,0,0,0,0,
+    0,0,0,6,0,0,0,0,3,
+    0,7,4,0,8,0,0,0,0,
+    0,0,0,0,0,3,0,0,2,
+    0,8,0,0,4,0,0,1,0,
+    6,0,0,5,0,0,0,0,0,
+    0,0,0,0,1,0,7,8,0,
+    5,0,0,0,0,9,0,0,0,
+    0,0,0,0,0,0,0,4,0};
+  solve_sudoku(board1);
+}
