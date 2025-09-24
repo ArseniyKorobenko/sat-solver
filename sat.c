@@ -81,8 +81,9 @@ Z L branch(V){L v;do{if(gH.n==0)R 0;v=hp_pop();}W(aav(v));R v|rng()<_/2;}
 Z V vbump(I i){gV.ai++;if(gH.b[i])hp_up(gH.b[i]-1);}Z V vdecay(V){i(gV.n,gV.ai*=decay);}
 Z I prop(V){W(gQ.head<gQ.n){L v=gQ.a[gQ.head++];
  if(!wv.a)continue;Watcher*i,*j,*end=wv.a+wv.n;
- for(i=j=wv.a;i<end;){if(i->c==_){i_;continue;}if(av(i->bl)==2){j_=i_;continue;}
-  I c=i->c;L*a=ca,n=v^1;if(*a==n){*a=a[1];a[1]=n;}/*slow if?*/;AS(a[1]==n);
+ for(i=j=wv.a;i<end;){__builtin_prefetch(gC.a+i[1].c);
+  if(i->c==_){i_;continue;}if(av(i->bl)==2){j_=i_;continue;}
+  I c=i->c;L*a=ca,n=v^1;if(*a==n){*a=a[1];a[1]=n;};AS(a[1]==n);
   if(*a!=i_.bl&&av(*a)==2){j_=wat(c,*a);continue;}
   if(k(2,a[-1],if(av(ak)!=3){a[1]=ak;ak=n;watch1(c,a[1]^1,*a);B}))continue;
   j_=wat(c,*a);if(av(*a)==3){W(i<end)j_=i_;wv.n-=i-j;R c;}
