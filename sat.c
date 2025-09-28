@@ -6,25 +6,22 @@
 typedef float F; typedef void V; typedef int I; typedef unsigned long long u64;
 typedef unsigned L; typedef struct{I c;L bl;} Watcher;
 /* ----------------USER INTERFACE----------------- */
-enum{_=-1u/2,LITS=100000,VARS=LITS/2,VARB=VARS/64,GC_SZ=1000000,GC_PERM=300000};
-I attempts=1000000; F decay=0.99; u64 seed=12345;
-I usr_clause(I,I*),solve();V dump(),reset();I pLit(I);L vLit(I);
 #define or(a...) {int r[]={a};usr_clause(arrlen(r),r);}
-
-#define j_ (*j++)     /*  HUNDRED LINE SAT SOLVER                        */
-#define i_ (*i++)     /*  Copyright Arseniy Korobenko 2025               */
-#define ai a[i]       /*                                                 */
-#define ak a[k]       /*  Clause minification is commented out           */
-#define wv gW[v]      /*  uncomment for larger problems. [in analyze()]  */
-#define cn gC.a[c]    /*                                                 */
-#define ca (gC.a+c+1) /*                                                 */
+I usr_clause(I,I*),solve();V dump(),reset();I pLit(I);L vLit(I);
+enum{_=-1u/2,LITS=(I)1e5,VARS=LITS/2,VARB=VARS/64,GC_SZ=(I)1e6,GC_PERM=(I)3e5};
+I attempts=1e6; F decay=0.99; u64 seed=12345;
 #define N I n         /*                                                 */
-#define W while       /*  literal = variable*2+sign (3=>6, -3=>7)        */
-#define B break;      /*                                                 */
-#define Z static      /*  gQ[0..n]=solution. use pLit to get signed ints */
+#define W while       /*  HUNDRED LINE SAT SOLVER                        */
+#define B break;      /*  Copyright Arseniy Korobenko 2025               */
 #define R return      /*                                                 */
-#define i(a,e)   ({I $=a;I i=0;W(i<$){e;i++;}$!=i;})
-#define k(a,b,e) ({I $=b;I k=a;W(k<$){e;k++;}$!=k;})
+#define Z static      /*  Bring Your Own I/O                             */
+#define ak a[k]       /*                                                 */
+#define ai a[i]       /*  literal = variable*2+sign (3=>6, -3=>7)        */
+#define wv gW[v]      /*                                                 */
+#define cn gC.a[c]    /*  gQ[0..n]=solution. use pLit to get signed ints */
+#define ca (gC.a+c+1) /*                                                 */
+#define i(a,e...)   ({I i=0,$=a;W(i<$){e;i++;}$!=i;})
+#define k(a,b,e...) ({I k=a,$=b;W(k<$){e;k++;}$!=k;})
 #define r(a,e...) ({typeof(a)r=a;e;r;}) /* ({ GNU C statement expression }) */
 #define AS(a) assert(a);
 #define arrlen(a) (I)(sizeof(a)/sizeof*(a))
@@ -34,24 +31,24 @@ I usr_clause(I,I*),solve();V dump(),reset();I pLit(I);L vLit(I);
 #define sn(n) b##n(gA.sn,v/2)
 #define p(b,v) r(b.n++,ANL(b);b.a[r]=v)
 #define c02(e) {L v=*ca^1,b=ca[1];{e;}v=ca[1]^1;b=*ca;{e;}}
-struct{N,a[VARS];} gLv; // backjump levels. Q[ai]
+struct{N,a[VARS];} gLv; // backjump levels. Q[ai]. n=depth of decision tree
 struct{N;Watcher*a;} gW[LITS]; // c=clause, bl=blocker. TODO: dont use malloc
 struct{N,head;L a[VARS];} gQ; // assignment queue/trail.
 struct{N,a[VARS],b[VARS];} gH; // heap. p=(i-1)/2, l=i*2+1, r=i*2+2. b=indexof
-struct{N,temp,t,x,end;L a[GC_SZ];} gC; // clauses. temp=start, t=top, x=next
 struct{u64 av[VARB*2],sn[VARB];} gA; // bitvec: assigned, value, seen
+struct{N,temp,t,x,end;L a[GC_SZ];} gC; // clauses. temp=start, t=top, x=next
 struct{N,c[VARS],lv[VARS];F a[VARS];} gV; // cause, level, activity
 I pLit(N){R n&1?-n/2:n/2;}L vLit(N){R r(n<0?-n*2|1:n*2,AS(r<LITS));}
 // V reset(V){gLv.n=0;gQ.n=0;gV.n=0;gH.n=0;} // TODO:
 Z V init(V){AS(gV.n<VARS);gC.t=gC.x=gC.temp=GC_PERM;gC.end=GC_SZ*0.9;}
 Z I rng(V){seed^=seed<<13;seed^=seed>>7;seed^=seed<<17;R seed&_;} // xorshift
-Z I mx(I a,I b){R a>b?a:b;} Z Watcher wat(I c,L b){Watcher r={c,b};R r;}
+Z I mx(I a,I b){R a>b?a:b;}Z Watcher wat(I c,L b){Watcher r={c,b};R r;}
 Z V bset(u64*a,N){a[n/64]|=1ull<<n%64;}Z I bget(u64*a,N){R a[n/64]>>n%64&1;}
 Z V bclr(u64*a,N){a[n/64]&=~(1ull<<n%64);}
 Z I aav(L v){R 3&gA.av[v/64]>>v/2*2%64;}Z I av(L v){R aav(v)^v&1;} // 2t 3f 0? 1?
-Z V hp_up(I i){I*a=gH.a;I v=ai,k;W(i&&gV.a[v]>gV.a[a[k=(i-1)/2]])
+Z V hp_up(I i){I*a=gH.a,v=ai,k;W(i&&gV.a[v]>gV.a[a[k=(i-1)/2]])
   {gH.b[ai=ak]=i+1;i=k;}ai=v;gH.b[v]=i+1;}
-Z V hp_down(I i){I*a=gH.a;I v=ai;W(i*2+1<gH.n){I j=i*2+1,r=i*2+2;I k=r<gH.n&&
+Z V hp_down(I i){I*a=gH.a,v=ai;W(i*2+1<gH.n){I j=i*2+1,r=i*2+2,k=r<gH.n&&
   gV.a[a[r]]>gV.a[a[j]]?r:j;if(gV.a[ak]<=gV.a[v])B;gH.b[ai=ak]=i+1;i=k;}ai=v;}
 Z V hp_put(L v){if(gH.b[v/=2])R;gH.b[v]=gH.n;hp_up(p(gH,v));}
 Z I hp_pop(){I*a=gH.a;R gH.n?2*r(*a,gH.b[*a=a[--gH.n]]=1;gH.b[r]=0;if(gH.n>1)hp_down(0)):0;}
@@ -75,24 +72,22 @@ Z V vbump(I i){gV.ai++;if(gH.b[i])hp_up(gH.b[i]-1);}Z V vdecay(V){i(gV.n,gV.ai*=
 Z I prop(V){W(gQ.head<gQ.n){L v=gQ.a[gQ.head++];
  if(!wv.a)continue;Watcher*i,*j,*end=wv.a+wv.n;
  for(i=j=wv.a;i<end;){if(i<end-2)__builtin_prefetch(gC.a+i[2].c);
-  if(i->c==_){i_;continue;}if(av(i->bl)==2){j_=i_;continue;}
+  if(i->c==_){i++;continue;}if(av(i->bl)==2){*j++=*i++;continue;}
   I c=i->c;L*a=ca,n=v^1;if(*a==n){*a=a[1];a[1]=n;};AS(a[1]==n);
-  if(*a!=i_.bl&&av(*a)==2){j_=wat(c,*a);continue;}
+  if(*a!=(*i++).bl&&av(*a)==2){*j++=wat(c,*a);continue;}
   if(k(2,a[-1],if(av(ak)!=3){a[1]=ak;ak=n;watch1(c,a[1]^1,*a);B}))continue;
-  j_=wat(c,*a);if(av(*a)==3){W(i<end)j_=i_;wv.n-=i-j;R c;}
+  *j++=wat(c,*a);if(av(*a)==3){W(i<end)*j++=*i++;wv.n-=i-j;R c;}
   enq(*a,c);}wv.n-=i-j;}R _;}
 Z I analyze(I c,I*lv){I r=p(gC,0);p(gC,0);I deps=0,i=gQ.n;L v=0;
  do{AS(c!=_);AS(!v||v==*ca);k(!!v,cn,L v=ca[k];if(!sn(get)&&gV.lv[v/2]>0){
    vbump(v/2);sn(set);if(gV.lv[v/2]<gLv.n)p(gC,v);else deps++;});
   W(v=gQ.a[--i],!sn(get));c=gV.c[v/2];sn(clr);}W(--deps>0);
- c=r;cn=gC.n-r-1;L*a=ca;*a=v^1;
- // k(i=1,cn,I c=gV.c[ak/2];if(c==_)a[i++]=ak;else{for(I j=1;j<cn;j++){
- //   v=ca[j];if(!sn(get)&&gV.lv[v/2]>0){a[i++]=ak;B}}});cn=i;
- if(cn==1)*lv=0;else{i=1;
-  k(2,cn,if(gV.lv[ak/2]>gV.lv[ai/2])i=k);*lv=gV.lv[ai/2];r(a[1],a[1]=ai;ai=r);}
- i(gV.n+1,gA.sn[i/64]=0);R c;}
-I solve(){init();I confs=0,RST=1000;i(attempts,I conf=prop();if(conf!=_){
- if(gLv.n==0)R 0;I lv=0;I c=analyze(conf,&lv);back_to(lv);c=clause(c,0);
+ c=r;cn=gC.n-r-1;L*a=ca;*a=v^1;k(i=1,cn,I c=gV.c[ak/2];if(c==_)a[i++]=ak;else
+  {for(I j=1;j<cn;j++){v=ca[j];if(!sn(get)&&gV.lv[v/2]>0){a[i++]=ak;B}}});cn=i;
+ if(cn==1)*lv=0;else{i=1;k(2,cn,if(gV.lv[ak/2]>gV.lv[ai/2])i=k);
+  *lv=gV.lv[ai/2];r(a[1],a[1]=ai;ai=r);}i(gV.n+1,gA.sn[i/64]=0);R c;}
+I solve(){init();I confs=999,RST=1000;i(attempts,I conf=prop();if(conf!=_){
+ if(gLv.n==0)R 0;I lv=0,c=analyze(conf,&lv);back_to(lv);c=clause(c,0);
  if(c!=_)enq(*ca,c);vdecay();if(++confs>RST){RST*=1.1;confs=0;
  i(gV.n,gV.ai=rng()/(_/15.f));for(I i=gH.n/2-1;i>=0;)hp_down(i--);back_to(0);}
  }else{L v=branch();if(!v)R 1;p(gLv,gQ.n);enq(v,_);});back_to(0);R _;}
